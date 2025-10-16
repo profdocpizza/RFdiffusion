@@ -74,14 +74,22 @@ class SymGen:
 
         elif global_sym.lower().startswith('h'):
             # Helical symmetry
-            if len(global_sym.split('_')) != 2:
-                raise ValueError(f'Invalid helical symmetry {global_sym}')
-            order, trans = global_sym[1:].split('_')
-            if not order.isdigit() or not trans.replace('.','',1).isdigit():
-                raise ValueError(f'Invalid helical symmetry {global_sym}')
+            parts = global_sym.split('_')
+            if len(parts) != 5 or parts[0].upper() != 'H':
+                raise ValueError(f'Invalid helical symmetry format: {global_sym}. Expected H_<R/L>_<units_per_turn>_<rise_per_turn>_<num_turns>')
+
+            _, handedness, units_per_turn, rise_per_turn, num_turns = parts
+
+            try:
+                units_per_turn = float(units_per_turn)
+                rise_per_turn = float(rise_per_turn)
+                num_turns = float(num_turns)
+            except ValueError:
+                raise ValueError(f'Invalid numeric value in helical symmetry string: {global_sym}')
+
             self._log.info(
-                f'Initializing helical symmetry order {order} with translation {trans}.')
-            self._init_screw(int(order), float(trans))
+                f'Initializing helical symmetry: handedness={handedness}, units/turn={units_per_turn}, rise/turn={rise_per_turn}, num_turns={num_turns}')
+            self._init_screw(handedness, units_per_turn, rise_per_turn, num_turns)
             self.apply_symmetry = self._apply_screw
 
         elif global_sym.lower() in saved_symmetries:
@@ -100,17 +108,27 @@ class SymGen:
     ####################
     ## Screw symmetry ##
     ####################
-    def _init_screw(self, order, translation):
+    def _init_screw(self, handedness, units_per_turn, rise_per_turn, num_turns):
+        if handedness.upper() not in ['R', 'L']:
+            raise ValueError(f"Handedness must be 'R' or 'L', not {handedness}")
+
+        self.order = int(round(units_per_turn * num_turns))
+
+        translation_per_unit = rise_per_turn / units_per_turn
+        rotation_per_unit = 360.0 / units_per_turn
+        if handedness.upper() == 'L':
+            rotation_per_unit *= -1
+
         sym_rots = []
         sym_trans = []
-        for i in range(order):
-            deg = i * 360.0 / order
+        for i in range(self.order):
+            deg = i * rotation_per_unit
             r = Rotation.from_euler('z', deg, degrees=True)
             sym_rots.append(format_rots(r.as_matrix()))
-            sym_trans.append(torch.tensor([0, 0, i * translation]))
+            sym_trans.append(torch.tensor([0, 0, i * translation_per_unit]))
+
         self.sym_rots = sym_rots
         self.sym_trans = sym_trans
-        self.order = order
 
     def _apply_screw(self, coords_in, seq_in):
         coords_out = torch.clone(coords_in)

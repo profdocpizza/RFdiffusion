@@ -275,12 +275,17 @@ class Sampler:
         ################################
 
         # Generate a specific contig from the range of possibilities specified at input
+        if self.symmetry is not None and self.inf_conf.symmetry.lower().startswith('h'):
+            contig_str = self.contig_conf.contigs[0]
+            subunit_len = int(contig_str.split('-')[0])
+            full_len = subunit_len * self.symmetry.order
+            self.contig_conf.contigs = [f'{full_len}-{full_len}']
 
         self.contig_map = self.construct_contig(self.target_feats)
         self.mappings = self.contig_map.get_mappings()
         self.mask_seq = torch.from_numpy(self.contig_map.inpaint_seq)[None,:]
         self.mask_str = torch.from_numpy(self.contig_map.inpaint_str)[None,:]
-        self.binderlen =  len(self.contig_map.inpaint)    
+        self.binderlen =  len(self.contig_map.inpaint)
         
         #######################################
         ### Resolve cyclic peptide indicies ###

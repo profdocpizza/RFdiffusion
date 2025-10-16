@@ -44,18 +44,26 @@ For certain symmetries, especially those with off-axis symmetry axes, you may ne
 
 ## Advanced Topics & FAQ
 
-### Is it possible to run a screw symmetry?
+### How do I use helical symmetry?
 
-Yes, screw symmetry (a helical symmetry) is now supported. This allows for the generation of helical assemblies.
+Helical symmetry (a type of screw symmetry) is supported with a detailed set of controls, allowing for the generation of complex helical assemblies.
 
-To use screw symmetry, specify the symmetry in the format `H<N>_<T>`, where:
-- `<N>` is the rotational order (e.g., `6` for a 6-fold axis).
-- `<T>` is the translation distance in Angstroms along the Z-axis for each subunit.
+To use helical symmetry, specify the symmetry in the following format:
+`inference.symmetry=H_<R/L>_<units_per_turn>_<rise_per_turn>_<num_turns>`
 
-For example, to generate a 6-fold helix with a 10Å rise per subunit, you would use:
-`inference.symmetry=H6_10`
+-   `<R/L>`: The handedness of the helix (`R` for right-handed, `L` for left-handed).
+-   `<units_per_turn>`: The number of subunits in one full 360° turn of the helix. This can be a floating point number.
+-   `<rise_per_turn>`: The translation in Angstroms along the Z-axis for one full turn. This can be a floating point number.
+-   `<num_turns>`: The total number of full turns in the helix. This can be a floating point number.
 
-The implementation assumes the screw axis is the Z-axis.
+The total number of subunits in the assembly is calculated as `round(units_per_turn * num_turns)`. The length of the asymmetric unit (a single subunit) is defined by the input contig string (e.g., `contigs: [50-50]` for a 50-residue subunit).
+
+**Example:**
+
+To generate a right-handed helix with 6.3 subunits per turn, a rise of 8.2Å per turn, and a total of 3.5 turns, you would use:
+`inference.symmetry=H_R_6.3_8.2_3.5`
+
+This would generate a helix with `round(6.3 * 3.5) = 22` subunits.
 
 ### Is it possible to run a 3x stacked C3 symmetries such that each unit would be diffused identically (9x identical units)?
 
