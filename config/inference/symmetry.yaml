@@ -1,6 +1,7 @@
 # Config for sampling symmetric assemblies.
 
 defaults:
+  - _self_
   - base
 
 inference:
