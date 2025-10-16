@@ -276,10 +276,18 @@ class Sampler:
 
         # Generate a specific contig from the range of possibilities specified at input
         if self.symmetry is not None and self.inf_conf.symmetry.lower().startswith('h'):
-            contig_str = self.contig_conf.contigs[0]
-            subunit_len = int(contig_str.split('-')[0])
+            # For helical symmetry, the contig defines the asymmetric unit.
+            # The total length is determined by the symmetry parameters.
+
+            # Create a temporary ContigMap to determine the length of the asymmetric unit.
+            temp_map = self.construct_contig(self.target_feats)
+            subunit_len = len(temp_map.inpaint)
+
+            # Calculate the full length and update the contig configuration.
             full_len = subunit_len * self.symmetry.order
-            self.contig_conf.contigs = [f'{full_len}-{full_len}']
+            # Using an explicit single-chain contig format for robustness.
+            self.contig_conf.contigs = [f'A1-{full_len}']
+            self._log.info(f"Helical symmetry detected. Overriding contig to generate {self.symmetry.order} subunits of length {subunit_len} (total length {full_len}).")
 
         self.contig_map = self.construct_contig(self.target_feats)
         self.mappings = self.contig_map.get_mappings()
