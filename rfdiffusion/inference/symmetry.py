@@ -72,6 +72,18 @@ class SymGen:
             self._init_octahedral()
             self.apply_symmetry = self._apply_octahedral
 
+        elif global_sym.lower().startswith('h'):
+            # Helical symmetry
+            if len(global_sym.split('_')) != 2:
+                raise ValueError(f'Invalid helical symmetry {global_sym}')
+            order, trans = global_sym[1:].split('_')
+            if not order.isdigit() or not trans.replace('.','',1).isdigit():
+                raise ValueError(f'Invalid helical symmetry {global_sym}')
+            self._log.info(
+                f'Initializing helical symmetry order {order} with translation {trans}.')
+            self._init_screw(int(order), float(trans))
+            self.apply_symmetry = self._apply_screw
+
         elif global_sym.lower() in saved_symmetries:
             # Using a saved symmetry 
             self._log.info('Initializing %s symmetry order.'%global_sym)
@@ -84,6 +96,37 @@ class SymGen:
 
         self.res_idx_procesing = fn.partial(
             self._lin_chainbreaks, num_breaks=self.order)
+
+    ####################
+    ## Screw symmetry ##
+    ####################
+    def _init_screw(self, order, translation):
+        sym_rots = []
+        sym_trans = []
+        for i in range(order):
+            deg = i * 360.0 / order
+            r = Rotation.from_euler('z', deg, degrees=True)
+            sym_rots.append(format_rots(r.as_matrix()))
+            sym_trans.append(torch.tensor([0, 0, i * translation]))
+        self.sym_rots = sym_rots
+        self.sym_trans = sym_trans
+        self.order = order
+
+    def _apply_screw(self, coords_in, seq_in):
+        coords_out = torch.clone(coords_in)
+        seq_out = torch.clone(seq_in)
+        if seq_out.shape[0] % self.order != 0:
+            raise ValueError(
+                f'Sequence length must be divisble by {self.order}')
+        subunit_len = seq_out.shape[0] // self.order
+        for i in range(self.order):
+            start_i = subunit_len * i
+            end_i = subunit_len * (i+1)
+            coords_out[start_i:end_i] = torch.einsum(
+                'bnj,kj->bnk', coords_out[:subunit_len], self.sym_rots[i]
+            ) + self.sym_trans[i][None, None, :]
+            seq_out[start_i:end_i]  = seq_out[:subunit_len]
+        return coords_out, seq_out
 
     #####################
     ## Cyclic symmetry ##
