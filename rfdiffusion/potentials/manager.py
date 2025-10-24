@@ -62,13 +62,21 @@ def calc_nchains(symbol, components=1):
     S = symbol.lower()
 
     if S.startswith('c'):
-        return int(S[1:])*components 
+        return int(S[1:])*components
     elif S.startswith('d'):
-        return 2*int(S[1:])*components 
+        return 2*int(S[1:])*components
     elif S.startswith('o'):
         raise NotImplementedError()
     elif S.startswith('t'):
         return 12*components
+    elif S.startswith('h'):
+        # Helical symmetry
+        # H_<R/L>_<units_per_turn>_<rise_per_turn>_<num_turns>
+        # e.g. H_R_8.0_20.0_2.5
+        s = S.split('_')
+        units_per_turn = float(s[2])
+        num_turns = float(s[4])
+        return int(units_per_turn * num_turns)
     else:
         raise RuntimeError('Unknown symmetry symbol ',S)
 
@@ -151,16 +159,18 @@ class PotentialManager:
 
             kwargs = {k: potential_dict[k] for k in potential_dict.keys() - {'type'}}
 
-            # symmetric oligomer contact potential args
+            # symmetric potential args
             if self.inference_config.symmetry:
-
-                num_chains = calc_nchains(symbol=self.inference_config.symmetry, components=1) # hard code 1 for now 
-                contact_kwargs={'nchain':num_chains,
-                                'intra_all':self.potentials_config.olig_intra_all,
-                                'inter_all':self.potentials_config.olig_inter_all,
-                                'contact_string':self.potentials_config.olig_custom_contact }
-                contact_matrix = make_contact_matrix(**contact_kwargs)
-                kwargs.update({'contact_matrix':contact_matrix})
+                num_chains = calc_nchains(symbol=self.inference_config.symmetry, components=1) # hard code 1 for now
+                if potential_dict['type'] == 'olig_contacts':
+                    contact_kwargs={'nchain':num_chains,
+                                    'intra_all':self.potentials_config.olig_intra_all,
+                                    'inter_all':self.potentials_config.olig_inter_all,
+                                    'contact_string':self.potentials_config.olig_custom_contact }
+                    contact_matrix = make_contact_matrix(**contact_kwargs)
+                    kwargs.update({'contact_matrix':contact_matrix})
+                elif potential_dict['type'] == 'per_chain_ROG':
+                    kwargs.update({'nchain':num_chains})
 
 
             to_apply.append(potentials.implemented_potentials[potential_dict['type']](**kwargs))

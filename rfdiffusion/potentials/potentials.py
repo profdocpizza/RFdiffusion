@@ -454,6 +454,47 @@ class substrate_contacts(Potential):
             self.motif_frame = xyz[rand_idx[0],:4]
             self.motif_mapping = [(rand_idx, i) for i in range(4)]
 
+class per_chain_ROG(Potential):
+    '''
+        Radius of Gyration potential for encouraging compactness of each chain in a symmetric assembly.
+    '''
+
+    def __init__(self, nchain, weight=1, min_dist=15):
+        self.nchain = int(nchain)
+        self.weight = weight
+        self.min_dist = min_dist
+
+    def compute(self, xyz):
+        L = xyz.shape[0]
+        if L % self.nchain != 0:
+            # Fall back to monomer_ROG behavior if length isn't divisible
+            Ca = xyz[:,1]
+            centroid = torch.mean(Ca, dim=0, keepdim=True)
+            dgram = torch.cdist(Ca[None,...], centroid[None,...], p=2)
+            dgram = torch.maximum(self.min_dist * torch.ones_like(dgram.squeeze(0)), dgram.squeeze(0))
+            rad_of_gyration = torch.sqrt(torch.sum(torch.square(dgram)) / Ca.shape[0])
+            return -1 * self.weight * rad_of_gyration
+
+        L_chain = L // self.nchain
+        total_rog = 0.0
+
+        for i in range(self.nchain):
+            start_idx = i * L_chain
+            end_idx = (i + 1) * L_chain
+            Ca = xyz[start_idx:end_idx, 1]
+
+            centroid = torch.mean(Ca, dim=0, keepdim=True)
+
+            dgram = torch.cdist(Ca[None,...], centroid[None,...], p=2)
+            dgram = torch.maximum(self.min_dist * torch.ones_like(dgram.squeeze(0)), dgram.squeeze(0))
+
+            rad_of_gyration = torch.sqrt(torch.sum(torch.square(dgram)) / L_chain)
+            total_rog += rad_of_gyration
+
+        avg_rog = total_rog / self.nchain
+
+        return -1 * self.weight * avg_rog
+
 # Dictionary of types of potentials indexed by name of potential. Used by PotentialManager.
 # If you implement a new potential you must add it to this dictionary for it to be used by
 # the PotentialManager
@@ -464,7 +505,8 @@ implemented_potentials = { 'monomer_ROG':          monomer_ROG,
                            'interface_ncontacts':  interface_ncontacts,
                            'monomer_contacts':     monomer_contacts,
                            'olig_contacts':        olig_contacts,
-                           'substrate_contacts':    substrate_contacts}
+                           'substrate_contacts':   substrate_contacts,
+                           'per_chain_ROG':        per_chain_ROG}
 
 require_binderlen      = { 'binder_ROG',
                            'binder_distance_ReLU',
